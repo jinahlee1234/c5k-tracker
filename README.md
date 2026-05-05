@@ -1,4 +1,4 @@
-Couch to 5K for AI — Challenge Tracker
+#Couch to 5K for AI — Challenge Tracker
 A shared progress tracker for groups doing the Couch to 5K for AI challenge together.
 Live tracker → jinahlee1234.github.io/c5k-tracker
 
