@@ -1,4 +1,4 @@
-# Couch to 5K for AI — Group Tracker
+# Couch to 5K for AI — Challenge Tracker
 
 A shared progress tracker for groups doing the [Couch to 5K for AI](https://couchto5k.ai) challenge together.
 
