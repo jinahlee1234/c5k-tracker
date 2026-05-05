@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Couch to 5K for AI — Group Tracker</title>
+<title>Couch to 5K for AI Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -226,6 +226,36 @@ td.name-col {
   vertical-align: middle;
 }
 
+.info-bar {
+  border-radius: 12px;
+  padding: 10px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.info-bar a {
+  color: var(--orange);
+  font-size: 14px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.info-bar a:hover { text-decoration: underline; }
+
+
+footer {
+  text-align: center;
+  padding: 32px 24px 40px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+footer a { color: var(--muted); text-decoration: underline; }
+footer a:hover { color: var(--text); }
+
 @media (max-width: 600px) {
   header { padding: 16px; }
   main { padding: 16px 12px; }
@@ -240,8 +270,8 @@ td.name-col {
   <div class="logo">
     <div class="logo-dot"></div>
     <div>
-      <h1>Couch to 5K for AI</h1>
-      <span>Group progress tracker</span>
+      <h1>Couch to 5K for AI Tracker</h1>
+      <span>Progress tracker for your 30 day AI challenge</span>
     </div>
   </div>
   <div class="header-stats">
@@ -261,10 +291,17 @@ td.name-col {
 </header>
 
 <main>
+  <div class="info-bar">
+    <span style="font-size:14px;color:var(--muted);">4 weeks · 30 exercises · 10 min/day</span>
+    <a href="https://couchto5k.ai" target="_blank">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      View the challenge at couchto5k.ai
+    </a>
+  </div>
+
   <div class="add-bar">
     <input type="text" id="nameInput" placeholder="Enter your name to join..." maxlength="40" />
     <button class="btn-primary" id="addBtn" onclick="addMember()">+ Join</button>
-    <button class="btn-secondary" onclick="exportCSV()">Export CSV</button>
   </div>
 
   <div class="week-nav" id="weekNav"></div>
@@ -282,6 +319,11 @@ td.name-col {
 </main>
 
 <div class="toast" id="toast"></div>
+
+<footer>
+  <div>Vibe coded by <a href="https://www.linkedin.com/in/jinahlee1234" target="_blank">Jin Ah Lee</a> · <a href="https://github.com/jinahlee1234/c5k-tracker/issues" target="_blank">Report issues</a></div>
+  <div>Challenge originally created by <a href="https://www.linkedin.com/in/hilarygridley/" target="_blank">Hilary Gridley</a> · <a href="https://couchto5k.ai" target="_blank">couchto5k.ai</a></div>
+</footer>
 
 <script>
 const API = "https://script.google.com/macros/s/AKfycbzVCd7OeQEV-vdEHF9Ohi-gLAnKek_0vHT1ll4hiivd1CYyWsHGN1qZHbNVCAyNu6mnLQ/exec";
@@ -327,7 +369,7 @@ const WEEKS = [
   { num: 4, name: "Put AI to Work" },
 ];
 
-let state = { members: [], checks: {} };
+let state = { members: [], checks: {}, meta: {} };
 let activeWeek = "all";
 let pendingCells = new Set();
 
@@ -345,13 +387,24 @@ async function api(params) {
   }
 }
 
-async function loadAll() {
+const LS_CACHE_KEY = "c5k_cache_v1";
+
+async function loadAll(showCacheFirst = false) {
+  if (showCacheFirst) {
+    try {
+      const cached = localStorage.getItem(LS_CACHE_KEY);
+      if (cached) { state = JSON.parse(cached); render(); }
+    } catch(e) {}
+  }
   try {
     const data = await api({ method: "GET", action: "getAll" });
     state = data;
+    try { localStorage.setItem(LS_CACHE_KEY, JSON.stringify(data)); } catch(e) {}
     render();
   } catch(e) {
-    document.getElementById("tbody").innerHTML = `<tr><td colspan="35" class="loading-overlay" style="color:#B91C1C;">Failed to load. Check your Apps Script URL.</td></tr>`;
+    if (!showCacheFirst) {
+      document.getElementById("tbody").innerHTML = `<tr><td colspan="35" class="loading-overlay" style="color:#B91C1C;">Failed to load. Check your Apps Script URL.</td></tr>`;
+    }
   }
 }
 
@@ -366,6 +419,8 @@ async function addMember() {
     const res = await api({ action: "addMember", name });
     if (res.ok) {
       input.value = "";
+      if (!state.meta[name]) state.meta[name] = {};
+      state.meta[name].joined_at = res.joined_at;
       showToast("Welcome, " + name + "! 🎉");
       await loadAll();
     } else {
@@ -396,7 +451,12 @@ async function toggle(name, day, cellEl) {
   renderTable();
 
   try {
-    await api({ action: "toggle", name, day });
+    const res = await api({ action: "toggle", name, day });
+    if (res.completed_at !== undefined) {
+      if (!state.meta[name]) state.meta[name] = {};
+      state.meta[name].completed_at = res.completed_at;
+      renderTable();
+    }
   } catch(e) {
     state.checks[name][day] = prev;
     renderTable();
@@ -446,6 +506,8 @@ function renderTable() {
     <th class="name-col">Name</th>
     ${days.map(d => `<th title="Day ${d.day}: ${d.title}"><div class="day-head"><span class="day-num">D${d.day}</span><span class="day-title-tip">${d.title}</span></div></th>`).join("")}
     <th class="prog-col">Progress</th>
+    <th style="min-width:90px;text-align:left;padding-left:8px;">Joined</th>
+    <th style="min-width:90px;text-align:left;padding-left:8px;">Finished</th>
     <th></th>
   </tr>`;
 
@@ -473,6 +535,9 @@ function renderTable() {
     }).join("");
 
     const medal = idx === 0 && p.done > 0 ? "🥇 " : "";
+    const m = state.meta[name] || {};
+    const joinedStr = m.joined_at ? fmtDate(m.joined_at) : "—";
+    const completedStr = m.completed_at ? fmtDate(m.completed_at) : "—";
 
     return `<tr>
       <td class="name-col">${medal}${name}</td>
@@ -481,9 +546,16 @@ function renderTable() {
         <div class="prog-bar"><div class="prog-fill" style="width:${p.pct}%"></div></div>
         <div class="prog-text">${p.done}/${p.total} · ${p.pct}%</div>
       </td>
+      <td style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;text-align:left;padding-left:8px;white-space:nowrap;">${joinedStr}</td>
+      <td style="font-size:11px;color:${m.completed_at ? 'var(--success)' : 'var(--muted)'};font-family:'DM Mono',monospace;text-align:left;padding-left:8px;white-space:nowrap;">${completedStr}</td>
       <td><button class="remove-btn" onclick="removeMember('${name.replace(/'/g,"\\'")}')">×</button></td>
     </tr>`;
   }).join("");
+}
+
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
 }
 
 function render() {
@@ -516,8 +588,8 @@ function showToast(msg) {
 
 document.getElementById("nameInput").addEventListener("keydown", e => { if (e.key === "Enter") addMember(); });
 
-loadAll();
-setInterval(loadAll, 30000);
+loadAll(true);
+setInterval(() => loadAll(false), 30000);
 </script>
 </body>
 </html>
